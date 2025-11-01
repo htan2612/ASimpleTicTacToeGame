@@ -1,0 +1,22 @@
+# Visual Studio cache
+.vs/
+*.vcxproj.user
+*.VC.db
+*.VC.opendb
+
+# Build output
+Debug/
+Release/
+x64/
+*.obj
+*.pdb
+*.exe
+*.log
+*.tlog
+*.ipch
+
+# Temporary files
+*.aps
+*.ncb
+*.sdf
+*.cachefile
