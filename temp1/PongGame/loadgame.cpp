@@ -94,8 +94,9 @@ void RenderLoadGameList(sf::RenderWindow& window, sf::Font& font,
     else {
         float startY = 180;
         float spacing = 100;
+        int maxVisible = 5; // Maximum games visible at once
 
-        for (size_t i = 0; i < savedGames.size(); i++) {
+        for (size_t i = 0; i < savedGames.size() && i < maxVisible; i++) {
             float posY = startY + i * spacing;
             bool isSelected = (i == selected);
 
@@ -124,16 +125,60 @@ void RenderLoadGameList(sf::RenderWindow& window, sf::Font& font,
             dateText.setPosition({ 120, posY + 45 });
             dateText.setFillColor(sf::Color(200, 200, 200));
             window.draw(dateText);
+
+            // Delete icon (X button on the right)
+            sf::CircleShape deleteBtn(20);
+            deleteBtn.setPosition({ Width - 180, posY + 20 });
+            deleteBtn.setFillColor(isSelected ? sf::Color(220, 50, 50, 255) : sf::Color(180, 60, 60, 200));
+            deleteBtn.setOutlineThickness(2);
+            deleteBtn.setOutlineColor(sf::Color::White);
+            window.draw(deleteBtn);
+
+            // X mark
+            sf::Text xMark(font);
+            xMark.setString("X");
+            xMark.setCharacterSize(30);
+            xMark.setFillColor(sf::Color::White);
+            sf::FloatRect xBounds = xMark.getLocalBounds();
+            xMark.setOrigin({ xBounds.size.x / 2, xBounds.size.y / 2 });
+            xMark.setPosition({ Width - 160, posY + 40 });
+            window.draw(xMark);
         }
     }
 
     // Instructions
     sf::Text instruction(font);
-    instruction.setString("W/S: Select | ENTER: Load | ESC: Back");
-    instruction.setCharacterSize(20);
+    instruction.setString("W/S: Select | ENTER: Load | DELETE: Remove Selected | C: Clear All | ESC: Back");
+    instruction.setCharacterSize(18);
     sf::FloatRect instrBounds = instruction.getLocalBounds();
     instruction.setOrigin({ instrBounds.size.x / 2, instrBounds.size.y / 2 });
     instruction.setPosition({ Width / 2, Height - 50 });
     instruction.setFillColor(sf::Color(180, 180, 180));
     window.draw(instruction);
+}
+
+bool DeleteSavedGame(const std::string& filename) {
+    try {
+        return fs::remove(filename);
+    }
+    catch (...) {
+        return false;
+    }
+}
+
+bool ClearAllSavedGames() {
+    try {
+        int count = 0;
+        for (const auto& entry : fs::directory_iterator(".")) {
+            if (entry.path().extension() == ".caro") {
+                if (fs::remove(entry.path())) {
+                    count++;
+                }
+            }
+        }
+        return count > 0;
+    }
+    catch (...) {
+        return false;
+    }
 }

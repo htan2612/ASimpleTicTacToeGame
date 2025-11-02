@@ -212,6 +212,17 @@ int main()
                         player2Name.pop_back();
                     }
                 }
+                else if (state == GameState::INPUT_NAME_P2) {
+                    if (keyPressed->scancode == sf::Keyboard::Scancode::Enter && !player2Name.empty()) {
+                        playerX = playerName;
+                        playerO = player2Name;
+                        state = GameState::PLAYING;
+                        ResetBoard(board, cursorRow, cursorCol, turn, gameOver, winner, offsetX, offsetY, CELL_SIZE);
+                    }
+                    else if (keyPressed->scancode == sf::Keyboard::Scancode::Backspace && !player2Name.empty()) {
+                        player2Name.pop_back();
+                    }
+                }
                 else if (state == GameState::LOAD_GAME_LIST) {
                     if (!savedGames.empty()) {
                         if (keyPressed->scancode == sf::Keyboard::Scancode::W) {
@@ -224,8 +235,37 @@ int main()
                             if (LoadGame(board, turn, savedGames[loadGameSelected].filename.c_str(),
                                 gameOver, winner, playerX, playerO, gameMode)) {
                                 playerName = playerX;
+                                // Update board shapes after loading
+                                for (int i = 0; i < BOARD_SIZE; ++i) {
+                                    for (int j = 0; j < BOARD_SIZE; ++j) {
+                                        board[i][j].shape.setSize({ CELL_SIZE - 2.f, CELL_SIZE - 2.f });
+                                        board[i][j].shape.setPosition({ offsetX + j * CELL_SIZE, offsetY + i * CELL_SIZE });
+                                        board[i][j].shape.setFillColor(sf::Color(240, 240, 240, 50));
+                                        board[i][j].shape.setOutlineThickness(1);
+                                        board[i][j].shape.setOutlineColor(sf::Color(100, 100, 100));
+                                    }
+                                }
                                 state = GameState::PLAYING;
                                 aiClock.restart();
+                            }
+                        }
+                        else if (keyPressed->scancode == sf::Keyboard::Scancode::Delete) {
+                            // Delete selected save
+                            if (DeleteSavedGame(savedGames[loadGameSelected].filename)) {
+                                savedGames = GetSavedGames();
+                                if (savedGames.empty()) {
+                                    loadGameSelected = 0;
+                                }
+                                else if (loadGameSelected >= savedGames.size()) {
+                                    loadGameSelected = savedGames.size() - 1;
+                                }
+                            }
+                        }
+                        else if (keyPressed->scancode == sf::Keyboard::Scancode::C) {
+                            // Clear all saves
+                            if (ClearAllSavedGames()) {
+                                savedGames.clear();
+                                loadGameSelected = 0;
                             }
                         }
                     }
@@ -365,16 +405,51 @@ int main()
             RenderMenu(window, title, texts, boxes);
         }
         else if (state == GameState::INPUT_NAME) {
-            RenderInputName(window, font, playerName, Width, Height);
+            // Player 1 input
+            sf::Text title1(font);
+            title1.setString("PLAYER 1 - ENTER YOUR NAME");
+            title1.setCharacterSize(50);
+            sf::FloatRect titleBounds1 = title1.getLocalBounds();
+            title1.setOrigin({ titleBounds1.size.x / 2, titleBounds1.size.y / 2 });
+            title1.setPosition({ Width / 2, Height / 3 });
+            title1.setFillColor(sf::Color::Yellow);
+            window.draw(title1);
+
+            sf::RectangleShape inputBox({ 500, 60 });
+            inputBox.setOrigin({ 250, 30 });
+            inputBox.setPosition({ Width / 2, Height / 2 });
+            inputBox.setFillColor(sf::Color(50, 50, 80, 200));
+            inputBox.setOutlineThickness(3);
+            inputBox.setOutlineColor(sf::Color::White);
+            window.draw(inputBox);
+
+            sf::Text nameText(font);
+            nameText.setString(playerName.empty() ? "_" : playerName);
+            nameText.setCharacterSize(40);
+            sf::FloatRect nameBounds = nameText.getLocalBounds();
+            nameText.setOrigin({ nameBounds.size.x / 2, nameBounds.size.y / 2 });
+            nameText.setPosition({ Width / 2, Height / 2 });
+            nameText.setFillColor(sf::Color::White);
+            window.draw(nameText);
+
+            sf::Text instruction(font);
+            instruction.setString("Press ENTER when done | ESC to cancel");
+            instruction.setCharacterSize(20);
+            sf::FloatRect instrBounds = instruction.getLocalBounds();
+            instruction.setOrigin({ instrBounds.size.x / 2, instrBounds.size.y / 2 });
+            instruction.setPosition({ Width / 2, Height * 2 / 3 });
+            instruction.setFillColor(sf::Color(200, 200, 200));
+            window.draw(instruction);
         }
         else if (state == GameState::INPUT_NAME_P2) {
+            // Player 2 input
             sf::Text title2(font);
             title2.setString("PLAYER 2 - ENTER YOUR NAME");
             title2.setCharacterSize(50);
             sf::FloatRect titleBounds2 = title2.getLocalBounds();
             title2.setOrigin({ titleBounds2.size.x / 2, titleBounds2.size.y / 2 });
             title2.setPosition({ Width / 2, Height / 3 });
-            title2.setFillColor(sf::Color::Yellow);
+            title2.setFillColor(sf::Color::Cyan);
             window.draw(title2);
 
             sf::RectangleShape inputBox({ 500, 60 });

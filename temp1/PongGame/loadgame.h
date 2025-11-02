@@ -20,4 +20,8 @@ void RenderLoadGameList(sf::RenderWindow& window, sf::Font& font,
     const std::vector<SavedGame>& savedGames,
     int selected, float Width, float Height);
 
+bool DeleteSavedGame(const std::string& filename);
+
+bool ClearAllSavedGames();
+
 #endif
