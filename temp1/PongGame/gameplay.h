@@ -19,10 +19,12 @@ void ResetBoard(std::vector<std::vector<Cell>>& board, int& cursorRow, int& curs
 
 bool CheckWin(const std::vector<std::vector<Cell>>& board, int i, int j);
 
-bool SaveGame(const std::vector<std::vector<Cell>>& board, bool turn, const char* filename);
+bool SaveGame(const std::vector<std::vector<Cell>>& board, bool turn,
+    const std::string& playerName, GameMode mode, const char* filename);
 
 bool LoadGame(std::vector<std::vector<Cell>>& board, bool& turn, const char* filename,
-    bool& gameOver, std::string& winner);
+    bool& gameOver, std::string& winner, std::string& playerX,
+    std::string& playerO, GameMode& mode);
 
 void RenderGameplay(sf::RenderWindow& window, sf::Font& font,
     const std::vector<std::vector<Cell>>& board,
@@ -32,7 +34,6 @@ void RenderGameplay(sf::RenderWindow& window, sf::Font& font,
     float offsetX, float offsetY, float CELL_SIZE, float Width,
     GameMode mode);
 
-// Save match result
 void SaveMatchResult(const std::string& playerName, const std::string& result,
     GameMode mode, const std::string& opponent);
 

@@ -11,7 +11,10 @@ enum class GameState {
     SETTINGS,
     ABOUT,
     LOADGAME,
-    INPUT_NAME
+    INPUT_NAME,
+    INPUT_NAME_P2,
+    PAUSE_MENU,
+    LOAD_GAME_LIST
 };
 
 enum class GameMode {
@@ -32,5 +35,9 @@ void RenderMenu(sf::RenderWindow& window, const sf::Text& title,
 
 void RenderInputName(sf::RenderWindow& window, sf::Font& font,
     const std::string& playerName, float Width, float Height);
+
+void RenderPauseMenu(sf::RenderWindow& window, sf::Font& font,
+    const std::vector<sf::Text>& texts,
+    const std::vector<sf::RectangleShape>& boxes, float Width, float Height);
 
 #endif

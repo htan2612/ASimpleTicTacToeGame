@@ -3,6 +3,7 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <cstring>
 using namespace std;
 
 void ResetBoard(vector<vector<Cell>>& board, int& cursorRow, int& cursorCol,
@@ -38,7 +39,6 @@ bool CheckWin(const vector<vector<Cell>>& board, int i, int j) {
     for (int dir = 0; dir < 4; ++dir) {
         int count = 1;
 
-        // Đếm về phía trước
         for (int k = 1; k < 5; ++k) {
             int ni = i + dx[dir] * k;
             int nj = j + dy[dir] * k;
@@ -47,7 +47,6 @@ bool CheckWin(const vector<vector<Cell>>& board, int i, int j) {
             else break;
         }
 
-        // Đếm về phía sau
         for (int k = 1; k < 5; ++k) {
             int ni = i - dx[dir] * k;
             int nj = j - dy[dir] * k;
@@ -61,29 +60,59 @@ bool CheckWin(const vector<vector<Cell>>& board, int i, int j) {
     return false;
 }
 
-bool SaveGame(const vector<vector<Cell>>& board, bool turn, const char* filename) {
+bool SaveGame(const vector<vector<Cell>>& board, bool turn, const string& playerName,
+    GameMode mode, const char* filename) {
     ofstream f(filename, ios::binary);
     if (!f) return false;
+
+    // Save board
     for (int i = 0; i < BOARD_SIZE; i++)
         for (int j = 0; j < BOARD_SIZE; j++)
             f.write((char*)&board[i][j].c, sizeof(int));
+
+    // Save turn
     f.write((char*)&turn, sizeof(bool));
+
+    // Save metadata
+    char metadata[256] = { 0 };
+    string modeStr = (mode == GameMode::PVP) ? "PVP" : "PVC";
+    string metaStr = playerName + "|" + modeStr;
+    strncpy_s(metadata, 256, metaStr.c_str(), _TRUNCATE);
+    f.write(metadata, 256);
+
     f.close();
     return true;
 }
 
 bool LoadGame(vector<vector<Cell>>& board, bool& turn, const char* filename,
-    bool& gameOver, string& winner) {
+    bool& gameOver, string& winner, string& playerX, string& playerO, GameMode& mode) {
     ifstream f(filename, ios::binary);
     if (!f) return false;
 
     board.clear();
     board.resize(BOARD_SIZE, vector<Cell>(BOARD_SIZE));
 
+    // Load board
     for (int i = 0; i < BOARD_SIZE; i++)
         for (int j = 0; j < BOARD_SIZE; j++)
             f.read((char*)&board[i][j].c, sizeof(int));
+
+    // Load turn
     f.read((char*)&turn, sizeof(bool));
+
+    // Load metadata
+    char metadata[256] = { 0 };
+    f.read(metadata, 256);
+
+    string metaStr(metadata);
+    size_t pos = metaStr.find('|');
+    if (pos != string::npos) {
+        playerX = metaStr.substr(0, pos);
+        string modeStr = metaStr.substr(pos + 1);
+        mode = (modeStr == "PVP") ? GameMode::PVP : GameMode::PVC;
+        playerO = (mode == GameMode::PVP) ? "Player 2" : "Computer";
+    }
+
     f.close();
     gameOver = false;
     winner = "";
@@ -98,12 +127,10 @@ void RenderGameplay(sf::RenderWindow& window, sf::Font& font,
     float offsetX, float offsetY, float CELL_SIZE, float Width,
     GameMode mode) {
 
-    // Vẽ bàn cờ
     for (int i = 0; i < BOARD_SIZE; ++i) {
         for (int j = 0; j < BOARD_SIZE; ++j) {
             window.draw(board[i][j].shape);
 
-            // Vẽ X hoặc O
             if (board[i][j].c == -1) {
                 sf::Text mark(font);
                 mark.setString("X");
@@ -129,12 +156,10 @@ void RenderGameplay(sf::RenderWindow& window, sf::Font& font,
         }
     }
 
-    // Vẽ cursor
     if (!gameOver) {
         window.draw(cursor);
     }
 
-    // Hiển thị lượt chơi hoặc kết quả
     if (gameOver) {
         sf::Text resultText(font);
         resultText.setString(winner);
@@ -159,7 +184,7 @@ void RenderGameplay(sf::RenderWindow& window, sf::Font& font,
     }
 
     sf::Text instructionText(font);
-    instructionText.setString("WASD: Move | Enter: Place | L: Save | T: Load | ESC: Menu");
+    instructionText.setString("WASD: Move | Enter: Place | P: Pause | ESC: Menu");
     instructionText.setCharacterSize(20);
     instructionText.setFillColor(sf::Color(200, 200, 200));
     sf::Vector2u size = window.getSize();

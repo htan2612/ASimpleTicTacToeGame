@@ -106,3 +106,31 @@ void RenderInputName(sf::RenderWindow& window, sf::Font& font,
     instruction.setFillColor(sf::Color(200, 200, 200));
     window.draw(instruction);
 }
+
+void RenderPauseMenu(sf::RenderWindow& window, sf::Font& font,
+    const std::vector<sf::Text>& texts,
+    const std::vector<sf::RectangleShape>& boxes, float Width, float Height) {
+
+    // Semi-transparent overlay
+    sf::RectangleShape overlay({ static_cast<float>(Width), static_cast<float>(Height) });
+    overlay.setFillColor(sf::Color(0, 0, 0, 150));
+    window.draw(overlay);
+
+    // Pause title
+    sf::Text title(font);
+    title.setString("PAUSED");
+    title.setCharacterSize(80);
+    sf::FloatRect titleBounds = title.getLocalBounds();
+    title.setOrigin({ titleBounds.size.x / 2, titleBounds.size.y / 2 });
+    title.setPosition({ Width / 2, Height / 4 });
+    title.setFillColor(sf::Color::Yellow);
+    title.setOutlineColor(sf::Color::Black);
+    title.setOutlineThickness(4);
+    window.draw(title);
+
+    // Draw menu items
+    for (size_t i = 0; i < boxes.size(); i++) {
+        window.draw(boxes[i]);
+        window.draw(texts[i]);
+    }
+}

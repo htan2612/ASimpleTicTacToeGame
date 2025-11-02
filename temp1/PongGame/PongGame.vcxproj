@@ -25,6 +25,7 @@
     <ClCompile Include="gameplay.cpp" />
     <ClCompile Include="graphic.cpp" />
     <ClCompile Include="help.cpp" />
+    <ClCompile Include="loadgame.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="menu.cpp" />
     <ClCompile Include="settings.cpp" />
@@ -36,6 +37,7 @@
     <ClInclude Include="gameplay.h" />
     <ClInclude Include="graphic.h" />
     <ClInclude Include="help.h" />
+    <ClInclude Include="loadgame.h" />
     <ClInclude Include="menu.h" />
     <ClInclude Include="settings.h" />
   </ItemGroup>

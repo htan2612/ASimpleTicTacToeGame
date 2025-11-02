@@ -8,12 +8,12 @@
 #include "Settings.h"
 #include "About.h"
 #include "AI.h"
+#include "LoadGame.h"
 
 using namespace std;
 
 int main()
 {
-    // Tạo cửa sổ game
     sf::RenderWindow window(sf::VideoMode({ 1600,900 }), "Caro Game", sf::Style::Default, sf::State::Windowed);
     sf::Vector2u size = window.getSize();
     float Width = size.x;
@@ -27,7 +27,6 @@ int main()
         return EXIT_FAILURE;
     }
 
-    // Load avatar texture (optional - for About screen)
     sf::Texture avatarTexture;
     bool hasAvatar = avatarTexture.loadFromFile("../assets/avatar.png");
 
@@ -37,7 +36,7 @@ int main()
     float scaleY = static_cast<float>(Height) / texSize.y;
     background.setScale({ scaleX, scaleY });
 
-    // ===== Âm thanh =====
+    // ===== Audio =====
     sf::SoundBuffer move;
     if (!move.loadFromFile("../assets/newmove.wav"))
     {
@@ -60,9 +59,9 @@ int main()
     GameMode gameMode = GameMode::PVP;
     bool soundOn = true;
     sf::Clock clock;
-    sf::Clock aiClock; // For AI delay
+    sf::Clock aiClock;
     string playerName = "";
-    bool waitingForPlayerName = false;
+    string player2Name = "";
 
     // ===== Menu setup =====
     vector<string> menuItems = { "PVP", "PVE", "Load Game", "Settings","ABOUT", "Exit" };
@@ -82,22 +81,30 @@ int main()
     title.setOutlineColor(sf::Color::Black);
     title.setOutlineThickness(6);
 
+    // ===== Pause Menu =====
+    vector<string> pauseMenuItems = { "Resume", "Save & Exit", "Exit without Saving" };
+    vector<sf::Text> pauseTexts;
+    vector<sf::RectangleShape> pauseBoxes;
+    int pauseSelected = 0;
+
+    // ===== Load Game List =====
+    vector<SavedGame> savedGames;
+    int loadGameSelected = 0;
+
     // ===== Caro Game Setup =====
     vector<vector<Cell>> board(BOARD_SIZE, vector<Cell>(BOARD_SIZE));
-    bool turn = true; // true = X, false = O
+    bool turn = true;
     bool gameOver = false;
     string winner = "";
     string playerX = "Player X";
     string playerO = "Player O";
 
-    // Tính toán vị trí bàn cờ ở giữa màn hình
     float CELL_SIZE = 50.f;
     float boardWidth = BOARD_SIZE * CELL_SIZE;
     float boardHeight = BOARD_SIZE * CELL_SIZE;
     float offsetX = (Width - boardWidth) / 2;
     float offsetY = (Height - boardHeight) / 2;
 
-    // Cursor highlight
     int cursorRow = 0, cursorCol = 0;
     sf::RectangleShape cursor;
     cursor.setSize({ CELL_SIZE - 4.f, CELL_SIZE - 4.f });
@@ -124,6 +131,19 @@ int main()
                     if (state == GameState::MENU) {
                         window.close();
                     }
+                    else if (state == GameState::PLAYING) {
+                        state = GameState::PAUSE_MENU;
+                        pauseSelected = 0;
+                        pauseTexts.clear();
+                        pauseBoxes.clear();
+                        InitMenu(pauseTexts, pauseBoxes, pauseMenuItems, font, Width, Height, pauseSelected);
+                    }
+                    else if (state == GameState::PAUSE_MENU) {
+                        state = GameState::PLAYING;
+                    }
+                    else if (state == GameState::LOAD_GAME_LIST) {
+                        state = GameState::MENU;
+                    }
                     else {
                         state = GameState::MENU;
                     }
@@ -139,20 +159,20 @@ int main()
                     else if (keyPressed->scancode == sf::Keyboard::Scancode::Enter) {
                         if (soundOn) sfx.play();
                         string chosen = menuItems[selected];
-                        if (chosen == "Player vs Player") {
+                        if (chosen == "PVP") {
                             gameMode = GameMode::PVP;
                             state = GameState::INPUT_NAME;
                             playerName = "";
                         }
-                        else if (chosen == "Player vs Computer") {
+                        else if (chosen == "PVE") {
                             gameMode = GameMode::PVC;
                             state = GameState::INPUT_NAME;
                             playerName = "";
                         }
                         else if (chosen == "Load Game") {
-                            if (LoadGame(board, turn, "save.caro", gameOver, winner)) {
-                                state = GameState::PLAYING;
-                            }
+                            savedGames = GetSavedGames();
+                            loadGameSelected = 0;
+                            state = GameState::LOAD_GAME_LIST;
                         }
                         else if (chosen == "Exit") {
                             window.close();
@@ -165,24 +185,84 @@ int main()
                 }
                 else if (state == GameState::INPUT_NAME) {
                     if (keyPressed->scancode == sf::Keyboard::Scancode::Enter && !playerName.empty()) {
-                        state = GameState::PLAYING;
-                        playerX = playerName;
                         if (gameMode == GameMode::PVP) {
-                            playerO = "Player 2";
+                            state = GameState::INPUT_NAME_P2;
+                            player2Name = "";
                         }
                         else {
+                            playerX = playerName;
                             playerO = "Computer";
+                            state = GameState::PLAYING;
+                            ResetBoard(board, cursorRow, cursorCol, turn, gameOver, winner, offsetX, offsetY, CELL_SIZE);
+                            aiClock.restart();
                         }
-                        ResetBoard(board, cursorRow, cursorCol, turn, gameOver, winner, offsetX, offsetY, CELL_SIZE);
-                        aiClock.restart();
                     }
                     else if (keyPressed->scancode == sf::Keyboard::Scancode::Backspace && !playerName.empty()) {
                         playerName.pop_back();
                     }
                 }
-                else if (state == GameState::PLAYING && !gameOver) {
-                    // Di chuyển cursor
+                else if (state == GameState::INPUT_NAME_P2) {
+                    if (keyPressed->scancode == sf::Keyboard::Scancode::Enter && !player2Name.empty()) {
+                        playerX = playerName;
+                        playerO = player2Name;
+                        state = GameState::PLAYING;
+                        ResetBoard(board, cursorRow, cursorCol, turn, gameOver, winner, offsetX, offsetY, CELL_SIZE);
+                    }
+                    else if (keyPressed->scancode == sf::Keyboard::Scancode::Backspace && !player2Name.empty()) {
+                        player2Name.pop_back();
+                    }
+                }
+                else if (state == GameState::LOAD_GAME_LIST) {
+                    if (!savedGames.empty()) {
+                        if (keyPressed->scancode == sf::Keyboard::Scancode::W) {
+                            loadGameSelected = (loadGameSelected - 1 + savedGames.size()) % savedGames.size();
+                        }
+                        else if (keyPressed->scancode == sf::Keyboard::Scancode::S) {
+                            loadGameSelected = (loadGameSelected + 1) % savedGames.size();
+                        }
+                        else if (keyPressed->scancode == sf::Keyboard::Scancode::Enter) {
+                            if (LoadGame(board, turn, savedGames[loadGameSelected].filename.c_str(),
+                                gameOver, winner, playerX, playerO, gameMode)) {
+                                playerName = playerX;
+                                state = GameState::PLAYING;
+                                aiClock.restart();
+                            }
+                        }
+                    }
+                }
+                else if (state == GameState::PAUSE_MENU) {
                     if (keyPressed->scancode == sf::Keyboard::Scancode::W) {
+                        pauseSelected = (pauseSelected - 1 + pauseTexts.size()) % pauseTexts.size();
+                    }
+                    else if (keyPressed->scancode == sf::Keyboard::Scancode::S) {
+                        pauseSelected = (pauseSelected + 1) % pauseTexts.size();
+                    }
+                    else if (keyPressed->scancode == sf::Keyboard::Scancode::Enter) {
+                        if (soundOn) sfx.play();
+                        string chosen = pauseMenuItems[pauseSelected];
+                        if (chosen == "Resume") {
+                            state = GameState::PLAYING;
+                        }
+                        else if (chosen == "Save & Exit") {
+                            SaveGame(board, turn, playerName, gameMode, "autosave.caro");
+                            state = GameState::MENU;
+                        }
+                        else if (chosen == "Exit without Saving") {
+                            state = GameState::MENU;
+                        }
+                    }
+
+                    UpdateMenuSelection(pauseTexts, pauseBoxes, pauseSelected);
+                }
+                else if (state == GameState::PLAYING && !gameOver) {
+                    if (keyPressed->scancode == sf::Keyboard::Scancode::P) {
+                        state = GameState::PAUSE_MENU;
+                        pauseSelected = 0;
+                        pauseTexts.clear();
+                        pauseBoxes.clear();
+                        InitMenu(pauseTexts, pauseBoxes, pauseMenuItems, font, Width, Height, pauseSelected);
+                    }
+                    else if (keyPressed->scancode == sf::Keyboard::Scancode::W) {
                         if (cursorRow > 0) cursorRow--;
                     }
                     else if (keyPressed->scancode == sf::Keyboard::Scancode::S) {
@@ -194,35 +274,23 @@ int main()
                     else if (keyPressed->scancode == sf::Keyboard::Scancode::D) {
                         if (cursorCol < BOARD_SIZE - 1) cursorCol++;
                     }
-                    // Đánh cờ
                     else if (keyPressed->scancode == sf::Keyboard::Scancode::Enter) {
-                        // Only allow player move in PVP or when it's player's turn in PVC
                         if (gameMode == GameMode::PVP || (gameMode == GameMode::PVC && turn)) {
                             if (board[cursorRow][cursorCol].c == 0) {
                                 board[cursorRow][cursorCol].c = (turn ? -1 : 1);
 
                                 if (soundOn) sfx.play();
 
-                                // Kiểm tra thắng
                                 if (CheckWin(board, cursorRow, cursorCol)) {
                                     gameOver = true;
                                     winner = (turn ? playerX + " wins!" : playerO + " wins!");
-                                    // Save match result
                                     SaveMatchResult(playerName, winner, gameMode, playerO);
                                 }
 
                                 turn = !turn;
-                                aiClock.restart(); // Reset AI timer
+                                aiClock.restart();
                             }
                         }
-                    }
-                    // Save game
-                    else if (keyPressed->scancode == sf::Keyboard::Scancode::L) {
-                        SaveGame(board, turn, "save.caro");
-                    }
-                    // Load game
-                    else if (keyPressed->scancode == sf::Keyboard::Scancode::T) {
-                        LoadGame(board, turn, "save.caro", gameOver, winner);
                     }
                 }
                 else if (state == GameState::SETTINGS) {
@@ -250,22 +318,31 @@ int main()
                         }
                     }
                 }
+                else if (state == GameState::INPUT_NAME_P2) {
+                    if (textEntered->unicode < 128 && textEntered->unicode != 8 && textEntered->unicode != 13) {
+                        char c = static_cast<char>(textEntered->unicode);
+                        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                            (c >= '0' && c <= '9') || c == ' ' || c == '_') {
+                            if (player2Name.length() < 20) {
+                                player2Name += c;
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        // AI Move logic (for PVC mode)
+        // AI Move logic
         if (state == GameState::PLAYING && !gameOver && gameMode == GameMode::PVC && !turn) {
-            // Add delay for AI move (0.5 seconds)
             if (aiClock.getElapsedTime().asSeconds() > 0.5f) {
                 int aiRow, aiCol;
                 AIMove(board, aiRow, aiCol);
 
                 if (aiRow >= 0 && aiCol >= 0 && board[aiRow][aiCol].c == 0) {
-                    board[aiRow][aiCol].c = 1; // O for computer
+                    board[aiRow][aiCol].c = 1;
 
                     if (soundOn) sfx.play();
 
-                    // Check win
                     if (CheckWin(board, aiRow, aiCol)) {
                         gameOver = true;
                         winner = playerO + " wins!";
@@ -278,7 +355,6 @@ int main()
             }
         }
 
-        // Cập nhật vị trí cursor
         cursor.setPosition({ offsetX + cursorCol * CELL_SIZE, offsetY + cursorRow * CELL_SIZE });
 
         // ===== Render =====
@@ -291,8 +367,53 @@ int main()
         else if (state == GameState::INPUT_NAME) {
             RenderInputName(window, font, playerName, Width, Height);
         }
+        else if (state == GameState::INPUT_NAME_P2) {
+            sf::Text title2(font);
+            title2.setString("PLAYER 2 - ENTER YOUR NAME");
+            title2.setCharacterSize(50);
+            sf::FloatRect titleBounds2 = title2.getLocalBounds();
+            title2.setOrigin({ titleBounds2.size.x / 2, titleBounds2.size.y / 2 });
+            title2.setPosition({ Width / 2, Height / 3 });
+            title2.setFillColor(sf::Color::Yellow);
+            window.draw(title2);
+
+            sf::RectangleShape inputBox({ 500, 60 });
+            inputBox.setOrigin({ 250, 30 });
+            inputBox.setPosition({ Width / 2, Height / 2 });
+            inputBox.setFillColor(sf::Color(50, 50, 80, 200));
+            inputBox.setOutlineThickness(3);
+            inputBox.setOutlineColor(sf::Color::White);
+            window.draw(inputBox);
+
+            sf::Text nameText(font);
+            nameText.setString(player2Name.empty() ? "_" : player2Name);
+            nameText.setCharacterSize(40);
+            sf::FloatRect nameBounds = nameText.getLocalBounds();
+            nameText.setOrigin({ nameBounds.size.x / 2, nameBounds.size.y / 2 });
+            nameText.setPosition({ Width / 2, Height / 2 });
+            nameText.setFillColor(sf::Color::White);
+            window.draw(nameText);
+
+            sf::Text instruction(font);
+            instruction.setString("Press ENTER when done | ESC to cancel");
+            instruction.setCharacterSize(20);
+            sf::FloatRect instrBounds = instruction.getLocalBounds();
+            instruction.setOrigin({ instrBounds.size.x / 2, instrBounds.size.y / 2 });
+            instruction.setPosition({ Width / 2, Height * 2 / 3 });
+            instruction.setFillColor(sf::Color(200, 200, 200));
+            window.draw(instruction);
+        }
         else if (state == GameState::PLAYING) {
-            RenderGameplay(window, font, board, cursor, gameOver, winner, turn, playerX, playerO, offsetX, offsetY, CELL_SIZE, Width, gameMode);
+            RenderGameplay(window, font, board, cursor, gameOver, winner, turn, playerX, playerO,
+                offsetX, offsetY, CELL_SIZE, Width, gameMode);
+        }
+        else if (state == GameState::PAUSE_MENU) {
+            RenderGameplay(window, font, board, cursor, gameOver, winner, turn, playerX, playerO,
+                offsetX, offsetY, CELL_SIZE, Width, gameMode);
+            RenderPauseMenu(window, font, pauseTexts, pauseBoxes, Width, Height);
+        }
+        else if (state == GameState::LOAD_GAME_LIST) {
+            RenderLoadGameList(window, font, savedGames, loadGameSelected, Width, Height);
         }
         else if (state == GameState::SETTINGS) {
             RenderSettings(window, font, soundOn, Width, Height);
