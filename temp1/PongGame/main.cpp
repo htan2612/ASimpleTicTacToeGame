@@ -45,6 +45,15 @@ int main()
     }
     sf::Sound sfx(move);
 
+    // Thêm sound buffer cho hiệu ứng thắng
+    sf::SoundBuffer winBuffer;
+    bool hasWinSound = winBuffer.loadFromFile("../assets/win.wav");
+    if (!hasWinSound)
+    {
+        cerr << "Không thể load file win.wav - game sẽ chạy không có âm thanh thắng\n";
+    }
+    sf::Sound winSound(winBuffer);
+
     sf::Music music;
     if (!music.openFromFile("../assets/chillmusic.mp3"))
     {
@@ -58,8 +67,11 @@ int main()
     GameState state = GameState::MENU;
     GameMode gameMode = GameMode::PVP;
     bool soundOn = true;
+    bool musicPausedForWin = false; // Track nếu nhạc bị pause vì âm thanh thắng
     sf::Clock clock;
     sf::Clock aiClock;
+    sf::Clock animClock; // Clock cho animation
+    sf::Clock winSoundClock; // Clock để track thời gian âm thanh thắng
     string playerName = "";
     string player2Name = "";
 
@@ -98,6 +110,7 @@ int main()
     string winner = "";
     string playerX = "Player X";
     string playerO = "Player O";
+    WinningLine winLine; // Dòng thắng
 
     float CELL_SIZE = 50.f;
     float boardWidth = BOARD_SIZE * CELL_SIZE;
@@ -118,6 +131,16 @@ int main()
     while (window.isOpen())
     {
         float deltatime = clock.restart().asSeconds();
+        float animTime = animClock.getElapsedTime().asSeconds();
+
+        // Tự động phát lại nhạc nền sau khi âm thanh thắng kết thúc
+        // SFML 3.0.2: Sử dụng thời gian để track thay vì getStatus()
+        if (musicPausedForWin && winSoundClock.getElapsedTime().asSeconds() > winBuffer.getDuration().asSeconds()) {
+            if (soundOn) {
+                music.play();
+            }
+            musicPausedForWin = false;
+        }
 
         while (const std::optional event = window.pollEvent())
         {
@@ -194,6 +217,7 @@ int main()
                             playerO = "Computer";
                             state = GameState::PLAYING;
                             ResetBoard(board, cursorRow, cursorCol, turn, gameOver, winner, offsetX, offsetY, CELL_SIZE);
+                            winLine.exists = false;
                             aiClock.restart();
                         }
                     }
@@ -207,17 +231,7 @@ int main()
                         playerO = player2Name;
                         state = GameState::PLAYING;
                         ResetBoard(board, cursorRow, cursorCol, turn, gameOver, winner, offsetX, offsetY, CELL_SIZE);
-                    }
-                    else if (keyPressed->scancode == sf::Keyboard::Scancode::Backspace && !player2Name.empty()) {
-                        player2Name.pop_back();
-                    }
-                }
-                else if (state == GameState::INPUT_NAME_P2) {
-                    if (keyPressed->scancode == sf::Keyboard::Scancode::Enter && !player2Name.empty()) {
-                        playerX = playerName;
-                        playerO = player2Name;
-                        state = GameState::PLAYING;
-                        ResetBoard(board, cursorRow, cursorCol, turn, gameOver, winner, offsetX, offsetY, CELL_SIZE);
+                        winLine.exists = false;
                     }
                     else if (keyPressed->scancode == sf::Keyboard::Scancode::Backspace && !player2Name.empty()) {
                         player2Name.pop_back();
@@ -235,6 +249,7 @@ int main()
                             if (LoadGame(board, turn, savedGames[loadGameSelected].filename.c_str(),
                                 gameOver, winner, playerX, playerO, gameMode)) {
                                 playerName = playerX;
+                                winLine.exists = false;
                                 // Update board shapes after loading
                                 for (int i = 0; i < BOARD_SIZE; ++i) {
                                     for (int j = 0; j < BOARD_SIZE; ++j) {
@@ -321,10 +336,19 @@ int main()
 
                                 if (soundOn) sfx.play();
 
-                                if (CheckWin(board, cursorRow, cursorCol)) {
+                                if (CheckWin(board, cursorRow, cursorCol, winLine)) {
                                     gameOver = true;
                                     winner = (turn ? playerX + " wins!" : playerO + " wins!");
                                     SaveMatchResult(playerName, winner, gameMode, playerO);
+                                    animClock.restart(); // Reset animation clock
+
+                                    // Phát âm thanh thắng
+                                    if (soundOn && hasWinSound) {
+                                        music.pause(); // Tạm dừng nhạc nền
+                                        winSound.play();
+                                        winSoundClock.restart(); // Bắt đầu đếm thời gian
+                                        musicPausedForWin = true;
+                                    }
                                 }
 
                                 turn = !turn;
@@ -383,10 +407,19 @@ int main()
 
                     if (soundOn) sfx.play();
 
-                    if (CheckWin(board, aiRow, aiCol)) {
+                    if (CheckWin(board, aiRow, aiCol, winLine)) {
                         gameOver = true;
                         winner = playerO + " wins!";
                         SaveMatchResult(playerName, winner, gameMode, playerO);
+                        animClock.restart(); // Reset animation clock
+
+                        // Phát âm thanh thắng
+                        if (soundOn && hasWinSound) {
+                            music.pause(); // Tạm dừng nhạc nền
+                            winSound.play();
+                            winSoundClock.restart(); // Bắt đầu đếm thời gian
+                            musicPausedForWin = true;
+                        }
                     }
 
                     turn = !turn;
@@ -480,11 +513,11 @@ int main()
         }
         else if (state == GameState::PLAYING) {
             RenderGameplay(window, font, board, cursor, gameOver, winner, turn, playerX, playerO,
-                offsetX, offsetY, CELL_SIZE, Width, gameMode);
+                offsetX, offsetY, CELL_SIZE, Width, gameMode, winLine, animTime);
         }
         else if (state == GameState::PAUSE_MENU) {
             RenderGameplay(window, font, board, cursor, gameOver, winner, turn, playerX, playerO,
-                offsetX, offsetY, CELL_SIZE, Width, gameMode);
+                offsetX, offsetY, CELL_SIZE, Width, gameMode, winLine, animTime);
             RenderPauseMenu(window, font, pauseTexts, pauseBoxes, Width, Height);
         }
         else if (state == GameState::LOAD_GAME_LIST) {

@@ -19,7 +19,8 @@ void AIMove(vector<vector<Cell>>& board, int& aiRow, int& aiCol) {
 
                 // Check if AI can win
                 board[i][j].c = 1;
-                if (CheckWin(board, i, j)) {
+                WinningLine tempLine1;  // THÊM DÒNG NÀY
+                if (CheckWin(board, i, j, tempLine1)) {  // SỬA DÒNG NÀY
                     board[i][j].c = 0;
                     aiRow = i;
                     aiCol = j;
@@ -29,7 +30,8 @@ void AIMove(vector<vector<Cell>>& board, int& aiRow, int& aiCol) {
 
                 // Check if need to block player
                 board[i][j].c = -1;
-                if (CheckWin(board, i, j)) {
+                WinningLine tempLine2;  // THÊM DÒNG NÀY
+                if (CheckWin(board, i, j, tempLine2)) {  // SỬA DÒNG NÀY
                     board[i][j].c = 0;
                     score += 5000; // High priority to block
                 }
@@ -76,6 +78,7 @@ int EvaluatePosition(const vector<vector<Cell>>& board, int row, int col, int pl
     for (int dir = 0; dir < 8; dir++) {
         int ni = row + dx[dir];
         int nj = col + dy[dir];
+
         if (ni >= 0 && nj >= 0 && ni < BOARD_SIZE && nj < BOARD_SIZE) {
             if (board[ni][nj].c == player) {
                 score += 50; // Near friendly piece

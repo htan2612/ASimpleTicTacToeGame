@@ -13,11 +13,18 @@ struct Cell {
     sf::RectangleShape shape;
 };
 
+struct WinningLine {
+    std::vector<std::pair<int, int>> cells; // Các ô tạo thành dòng thắng
+    bool exists;
+
+    WinningLine() : exists(false) {}
+};
+
 void ResetBoard(std::vector<std::vector<Cell>>& board, int& cursorRow, int& cursorCol,
     bool& turn, bool& gameOver, std::string& winner,
     float offsetX, float offsetY, float CELL_SIZE);
 
-bool CheckWin(const std::vector<std::vector<Cell>>& board, int i, int j);
+bool CheckWin(const std::vector<std::vector<Cell>>& board, int i, int j, WinningLine& winLine);
 
 bool SaveGame(const std::vector<std::vector<Cell>>& board, bool turn,
     const std::string& playerName, GameMode mode, const char* filename);
@@ -32,9 +39,14 @@ void RenderGameplay(sf::RenderWindow& window, sf::Font& font,
     bool gameOver, const std::string& winner,
     bool turn, const std::string& playerX, const std::string& playerO,
     float offsetX, float offsetY, float CELL_SIZE, float Width,
-    GameMode mode);
+    GameMode mode, const WinningLine& winLine, float animTime);
 
 void SaveMatchResult(const std::string& playerName, const std::string& result,
     GameMode mode, const std::string& opponent);
+
+void RenderGameOverMenu(sf::RenderWindow& window, sf::Font& font,
+    const std::vector<sf::Text>& texts,
+    const std::vector<sf::RectangleShape>& boxes,
+    const std::string& winner, float Width, float Height);
 
 #endif
